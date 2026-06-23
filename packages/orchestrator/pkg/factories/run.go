@@ -50,6 +50,7 @@ import (
 	"github.com/e2b-dev/infra/packages/orchestrator/pkg/sandbox/network"
 	"github.com/e2b-dev/infra/packages/orchestrator/pkg/sandbox/template"
 	"github.com/e2b-dev/infra/packages/orchestrator/pkg/sandbox/template/peerclient"
+	"github.com/e2b-dev/infra/packages/orchestrator/pkg/sandbox/ublk"
 	"github.com/e2b-dev/infra/packages/orchestrator/pkg/server"
 	"github.com/e2b-dev/infra/packages/orchestrator/pkg/service"
 	"github.com/e2b-dev/infra/packages/orchestrator/pkg/service/machineinfo"
@@ -714,6 +715,13 @@ func run(config cfg.Config, opts Options) (success bool) {
 	})
 	closers = append(closers, closer{"device pool", devicePool.Close})
 
+	// ublk device pool
+	ublkPool, err := ublk.NewDevicePool(0)
+	if err != nil {
+		logger.L().Fatal(ctx, "failed to create ublk pool", zap.Error(err))
+	}
+	closers = append(closers, closer{"ublk pool", ublkPool.Shutdown})
+
 	// network pool
 	slotStorage, err := newStorage(ctx, nodeID, config.NetworkConfig, egressSetup.Proxy)
 	if err != nil {
@@ -732,7 +740,7 @@ func run(config cfg.Config, opts Options) (success bool) {
 	if networkAssignHook == nil {
 		networkAssignHook = sandbox.NoopNetworkAssignHook{}
 	}
-	sandboxFactory := sandbox.NewFactory(config.BuilderConfig, networkPool, devicePool, featureFlags, hostStatsDelivery, cgroupManager, egressSetup.Proxy, networkAssignHook, sandboxes)
+	sandboxFactory := sandbox.NewFactory(config.BuilderConfig, networkPool, devicePool, ublkPool, featureFlags, hostStatsDelivery, cgroupManager, egressSetup.Proxy, networkAssignHook, sandboxes)
 
 	// isolated filesystems cache (for nfs proxy)
 	builder := chrooted.NewBuilder(config)

@@ -243,7 +243,7 @@ func newTestInfra(t *testing.T, ctx context.Context) *testInfra {
 	ti.closers = append(ti.closers, func(ctx context.Context) { sandboxProxy.Close(ctx) })
 
 	// Factory + Builder
-	factory := sandbox.NewFactory(ctx, orcConfig.BuilderConfig, networkPool, devicePool, flags, hoststats.NewNoopDelivery(), cgroup.NewNoopManager(), network.NewNoopEgressProxy(), sandbox.NoopNetworkAssignHook{}, sandboxes)
+	factory := sandbox.NewFactory(ctx, orcConfig.BuilderConfig, networkPool, devicePool, nil, flags, hoststats.NewNoopDelivery(), cgroup.NewNoopManager(), network.NewNoopEgressProxy(), sandbox.NoopNetworkAssignHook{}, sandboxes)
 	ti.factory = factory
 
 	buildMetrics, _ := metrics.NewBuildMetrics(noop.MeterProvider{})

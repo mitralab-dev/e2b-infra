@@ -53,7 +53,7 @@ func TestNewFactoryWarmsThePromotedBinary(t *testing.T) {
 	f := NewFactory(
 		t.Context(),
 		cfg.BuilderConfig{OrchestratorBaseDir: base, HostEnvdPath: src},
-		nil, nil, binaryCacheFF(t, true), nil, nil, nil, nil, nil,
+		nil, nil, nil, binaryCacheFF(t, true), nil, nil, nil, nil, nil,
 	)
 
 	// Asynchronous by design, so Eventually is the right tool; nothing here
@@ -93,7 +93,7 @@ func TestNewFactoryDoesNotWarmWhenTheFlagIsOff(t *testing.T) {
 	f := NewFactory(
 		t.Context(),
 		cfg.BuilderConfig{OrchestratorBaseDir: base, HostEnvdPath: src},
-		nil, nil, binaryCacheFF(t, false), nil, nil, nil, nil, nil,
+		nil, nil, nil, binaryCacheFF(t, false), nil, nil, nil, nil, nil,
 	)
 
 	// Nothing to wait for, so assert the absence directly after giving a warm the
@@ -159,7 +159,7 @@ func TestNewFactoryWarmsAPinnedTargetBesideThePromotedBinary(t *testing.T) {
 	f := NewFactory(
 		t.Context(),
 		cfg.BuilderConfig{OrchestratorBaseDir: base, HostEnvdPath: promoted},
-		nil, nil, binaryCacheFFWithTarget(t, "9f9f9f9"), nil, nil, nil, nil, nil,
+		nil, nil, nil, binaryCacheFFWithTarget(t, "9f9f9f9"), nil, nil, nil, nil, nil,
 	)
 
 	// Both, not either: the promoted path stays warmed because a target flag can

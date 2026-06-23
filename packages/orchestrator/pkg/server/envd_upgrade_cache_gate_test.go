@@ -62,7 +62,7 @@ func upgradeGateServer(t *testing.T, hostEnvdPath, baseDir string, cacheOn bool)
 	builder := cfg.BuilderConfig{HostEnvdPath: hostEnvdPath, OrchestratorBaseDir: baseDir}
 	factory := sandbox.NewFactory(
 		t.Context(), builder,
-		nil, nil, ff, nil, nil, nil, nil, sandbox.NewSandboxesMap(),
+		nil, nil, nil, ff, nil, nil, nil, nil, sandbox.NewSandboxesMap(),
 	)
 
 	return &Server{

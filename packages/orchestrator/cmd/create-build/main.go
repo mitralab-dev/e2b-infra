@@ -390,7 +390,7 @@ func doBuild(
 			return fmt.Errorf("initialize cgroup root for -max-vcpus: %w", err)
 		}
 	}
-	sandboxFactory := sandbox.NewFactory(ctx, c.BuilderConfig, networkPool, devicePool, featureFlags, hoststats.NewNoopDelivery(), cgroupManager, network.NewNoopEgressProxy(), sandbox.NoopNetworkAssignHook{}, sandboxes)
+	sandboxFactory := sandbox.NewFactory(ctx, c.BuilderConfig, networkPool, devicePool, nil, featureFlags, hoststats.NewNoopDelivery(), cgroupManager, network.NewNoopEgressProxy(), sandbox.NoopNetworkAssignHook{}, sandboxes)
 
 	// Layered V4 builds need the upload coordinator so child layers wait on
 	// their parents' header finalization. Redis is nil (CLI is single-host —

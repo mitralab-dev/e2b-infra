@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -36,6 +37,7 @@ import (
 	"github.com/e2b-dev/infra/packages/orchestrator/pkg/sandbox/network"
 	"github.com/e2b-dev/infra/packages/orchestrator/pkg/sandbox/rootfs"
 	"github.com/e2b-dev/infra/packages/orchestrator/pkg/sandbox/template"
+	"github.com/e2b-dev/infra/packages/orchestrator/pkg/sandbox/ublk"
 	"github.com/e2b-dev/infra/packages/orchestrator/pkg/sandbox/uffd"
 	"github.com/e2b-dev/infra/packages/orchestrator/pkg/sandbox/uffd/prefetch"
 	"github.com/e2b-dev/infra/packages/orchestrator/pkg/sandbox/uffd/userfaultfd"
@@ -795,6 +797,7 @@ type Factory struct {
 	config            cfg.BuilderConfig
 	networkPool       network.PoolInterface
 	devicePool        *nbd.DevicePool
+	ublkPool          *ublk.DevicePool
 	featureFlags      *featureflags.Client
 	hostStatsDelivery hoststats.Delivery
 	cgroupManager     cgroup.Manager
@@ -834,6 +837,7 @@ func NewFactory(
 	config cfg.BuilderConfig,
 	networkPool network.PoolInterface,
 	devicePool *nbd.DevicePool,
+	ublkPool *ublk.DevicePool,
 	featureFlags *featureflags.Client,
 	hostStatsDelivery hoststats.Delivery,
 	cgroupManager cgroup.Manager,
@@ -850,6 +854,7 @@ func NewFactory(
 		config:            config,
 		networkPool:       networkPool,
 		devicePool:        devicePool,
+		ublkPool:          ublkPool,
 		featureFlags:      featureFlags,
 		hostStatsDelivery: hostStatsDelivery,
 		cgroupManager:     cgroupManager,
@@ -1173,14 +1178,24 @@ func (f *Factory) CreateSandbox(
 
 	var rootfsProvider rootfs.Provider
 	if rootfsCachePath == "" {
-		rootfsProvider, err = rootfs.NewNBDProvider(
-			ctx,
-			rootFS,
-			sandboxFiles.SandboxCacheRootfsPath(f.config.StorageConfig),
-			f.devicePool,
-			f.featureFlags,
-			sbxLogger,
-		)
+		if f.ublkPool != nil && os.Getenv("USE_UBLK_PROVIDER") == "true" {
+			rootfsProvider, err = rootfs.NewUblkProvider(
+				ctx,
+				rootFS,
+				sandboxFiles.SandboxCacheRootfsPath(f.config.StorageConfig),
+				f.ublkPool,
+				sbxLogger,
+			)
+		} else {
+			rootfsProvider, err = rootfs.NewNBDProvider(
+				ctx,
+				rootFS,
+				sandboxFiles.SandboxCacheRootfsPath(f.config.StorageConfig),
+				f.devicePool,
+				f.featureFlags,
+				sbxLogger,
+			)
+		}
 	} else {
 		rootfsProvider, err = rootfs.NewDirectProvider(
 			ctx,
@@ -1729,14 +1744,25 @@ func (f *Factory) ResumeSandbox(
 
 		telemetry.ReportEvent(ctx, "got template rootfs")
 
-		overlay, err := rootfs.NewNBDProvider(
-			ctx,
-			readonlyRootfs,
-			sandboxFiles.SandboxCacheRootfsPath(f.config.StorageConfig),
-			f.devicePool,
-			f.featureFlags,
-			sbxLogger,
-		)
+		var overlay rootfs.Provider
+		if f.ublkPool != nil && os.Getenv("USE_UBLK_PROVIDER") == "true" {
+			overlay, err = rootfs.NewUblkProvider(
+				ctx,
+				readonlyRootfs,
+				sandboxFiles.SandboxCacheRootfsPath(f.config.StorageConfig),
+				f.ublkPool,
+				sbxLogger,
+			)
+		} else {
+			overlay, err = rootfs.NewNBDProvider(
+				ctx,
+				readonlyRootfs,
+				sandboxFiles.SandboxCacheRootfsPath(f.config.StorageConfig),
+				f.devicePool,
+				f.featureFlags,
+				sbxLogger,
+			)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("failed to create rootfs overlay: %w", err)
 		}

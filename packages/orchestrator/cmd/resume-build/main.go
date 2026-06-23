@@ -1437,7 +1437,7 @@ func run(ctx context.Context, buildID string, iterations int, coldStart, noPrefe
 			return fmt.Errorf("initialize cgroup root for -vcpu/-max-vcpus: %w", err)
 		}
 	}
-	factory := sandbox.NewFactory(ctx, config.BuilderConfig, networkPool, devicePool, flags, hoststats.NewNoopDelivery(), cgroupManager, egressProxy, sandbox.NoopNetworkAssignHook{}, sandboxes)
+	factory := sandbox.NewFactory(ctx, config.BuilderConfig, networkPool, devicePool, nil, flags, hoststats.NewNoopDelivery(), cgroupManager, egressProxy, sandbox.NoopNetworkAssignHook{}, sandboxes)
 
 	fmt.Printf("📦 Loading %s...\n", buildID)
 	tmpl, releaseTmpl, err := cache.GetTemplatePinned(ctx, buildID, false, false)

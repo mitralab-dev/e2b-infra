@@ -93,7 +93,7 @@ func TestFactoryRunNetworkAssignHookFailures(t *testing.T) {
 func TestNewFactoryDefaultsNilNetworkAssignHook(t *testing.T) {
 	t.Parallel()
 
-	factory := NewFactory(t.Context(), cfg.BuilderConfig{}, nil, nil, nil, nil, nil, nil, nil, nil)
+	factory := NewFactory(t.Context(), cfg.BuilderConfig{}, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	require.IsType(t, NoopNetworkAssignHook{}, factory.networkAssignHook)
 }

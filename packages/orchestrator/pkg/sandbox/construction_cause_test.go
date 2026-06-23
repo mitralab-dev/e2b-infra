@@ -78,7 +78,7 @@ func TestFactoryFailedConstructorsPreserveCancellationCause(t *testing.T) {
 			pool := canceledConstructionPool{called: make(chan struct{})}
 			factory := NewFactory(t.Context(), cfg.BuilderConfig{
 				StorageConfig: storage.Config{SandboxCacheDir: t.TempDir()},
-			}, pool, nil, nil, nil, cgroup.NewNoopManager(), nil, nil, NewSandboxesMap())
+			}, pool, nil, nil, nil, nil, cgroup.NewNoopManager(), nil, nil, NewSandboxesMap())
 			config := NewConfig(Config{Vcpu: 1})
 			runtime := sandboxtypes.RuntimeMetadata{SandboxID: uuid.NewString(), ExecutionID: uuid.NewString()}
 			template := canceledConstructionTemplate{err: primary}
@@ -115,7 +115,7 @@ func TestFactoryFailedConstructorsDoNotAttributeIndependentErrorsToCancellation(
 			pool := canceledConstructionPool{called: make(chan struct{})}
 			factory := NewFactory(t.Context(), cfg.BuilderConfig{
 				StorageConfig: storage.Config{SandboxCacheDir: t.TempDir()},
-			}, pool, nil, nil, nil, cgroup.NewNoopManager(), nil, nil, NewSandboxesMap())
+			}, pool, nil, nil, nil, nil, cgroup.NewNoopManager(), nil, nil, NewSandboxesMap())
 			config := NewConfig(Config{Vcpu: 1})
 			runtime := sandboxtypes.RuntimeMetadata{SandboxID: uuid.NewString(), ExecutionID: uuid.NewString()}
 			template := canceledConstructionTemplate{err: primary}
@@ -270,7 +270,7 @@ func TestFactoryConstructorsRunTheNetworkAssignHook(t *testing.T) {
 
 				return nil, hookFailure
 			})
-			factory := NewFactory(t.Context(), builder, pool, devices, flags, hoststats.NewNoopDelivery(), cgroup.NewNoopManager(), network.NewNoopEgressProxy(), hook, NewSandboxesMap())
+			factory := NewFactory(t.Context(), builder, pool, devices, nil, flags, hoststats.NewNoopDelivery(), cgroup.NewNoopManager(), network.NewNoopEgressProxy(), hook, NewSandboxesMap())
 			runtime := sandboxtypes.RuntimeMetadata{SandboxID: uuid.NewString(), ExecutionID: uuid.NewString(), SandboxType: sandboxtypes.SandboxTypeSandbox}
 			config := NewConfig(Config{Vcpu: 1, Network: &orchestrator.SandboxNetworkConfig{}, FirecrackerConfig: versions})
 			template := bootTemplate{snapfile: filepath.Join(t.TempDir(), "snapfile")}

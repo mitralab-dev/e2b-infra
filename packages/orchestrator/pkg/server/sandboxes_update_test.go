@@ -283,7 +283,7 @@ func TestUpdate_EgressProxyFlagGate(t *testing.T) {
 			s := &Server{
 				sandboxFactory: sandbox.NewFactory(
 					t.Context(), cfg.BuilderConfig{},
-					nil, nil, ff, nil, nil, network.NewNoopEgressProxy(), nil, sandboxMap,
+					nil, nil, nil, ff, nil, nil, network.NewNoopEgressProxy(), nil, sandboxMap,
 				),
 				featureFlags:     ff,
 				info:             &service.ServiceInfo{},

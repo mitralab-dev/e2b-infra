@@ -389,6 +389,14 @@ func (s *Server) Create(ctx context.Context, req *orchestrator.SandboxCreateRequ
 		}
 	}
 
+	// Merge Docker image ENV vars from the template metadata into the sandbox
+	// config. User-provided env vars (from the SDK create call) take precedence.
+	if len(meta.Context.EnvVars) > 0 {
+		merged := maps.Clone(meta.Context.EnvVars)
+		maps.Copy(merged, config.Envd.Vars)
+		config.Envd.Vars = merged
+	}
+
 	// Read before the start too: a teardown that ends during it gave its pages
 	// back after the mmap failed, so a retry would find them.
 	stoppingBefore := s.sandboxFactory.Sandboxes.Stopping()

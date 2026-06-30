@@ -5,6 +5,8 @@ package server
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -58,6 +60,23 @@ func sandboxDrainLogInterval(elapsed time.Duration) time.Duration {
 	default:
 		return 15 * time.Minute
 	}
+}
+
+// The flag default (3) targets multi-node clusters; on a single node taking the
+// full load it is too low, and LaunchDarkly is not wired up to change it, so
+// this env var is the override.
+const maxStartingInstancesPerNodeEnv = "MAX_STARTING_INSTANCES_PER_NODE"
+
+func startingInstancesLimit(ctx context.Context, ff *featureflags.Client) int {
+	if raw := os.Getenv(maxStartingInstancesPerNodeEnv); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
+			return v
+		}
+		logger.L().Warn(ctx, "invalid MAX_STARTING_INSTANCES_PER_NODE, falling back to feature flag",
+			zap.String("value", raw))
+	}
+
+	return ff.IntFlag(ctx, featureflags.MaxStartingInstancesPerNode)
 }
 
 type Server struct {
@@ -120,7 +139,7 @@ func New(ctx context.Context, cfg ServiceConfig) (*Server, error) {
 	)
 	go uploadedBuilds.Start()
 
-	startingLimit := cfg.FeatureFlags.IntFlag(ctx, featureflags.MaxStartingInstancesPerNode)
+	startingLimit := startingInstancesLimit(ctx, cfg.FeatureFlags)
 	startingSandboxes, err := utils.NewAdjustableSemaphore(int64(startingLimit))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create starting sandboxes semaphore: %w", err)
@@ -384,7 +403,7 @@ func (s *Server) refreshStartingSandboxesLimit(ctx context.Context) {
 		case <-s.done:
 			return
 		case <-ticker.C:
-			limit := s.featureFlags.IntFlag(ctx, featureflags.MaxStartingInstancesPerNode)
+			limit := startingInstancesLimit(ctx, s.featureFlags)
 			if limit <= 0 {
 				continue
 			}

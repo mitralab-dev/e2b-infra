@@ -79,6 +79,23 @@ func startingInstancesLimit(ctx context.Context, ff *featureflags.Client) int {
 	return ff.IntFlag(ctx, featureflags.MaxStartingInstancesPerNode)
 }
 
+// The flag default (200) also targets multi-node clusters; a single node sized
+// for more (hugepages, tier cap) silently refuses creates during bursts, so
+// this env var is the override.
+const maxSandboxesPerNodeEnv = "MAX_SANDBOXES_PER_NODE"
+
+func runningSandboxesLimit(ctx context.Context, ff *featureflags.Client) int {
+	if raw := os.Getenv(maxSandboxesPerNodeEnv); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
+			return v
+		}
+		logger.L().Warn(ctx, "invalid MAX_SANDBOXES_PER_NODE, falling back to feature flag",
+			zap.String("value", raw))
+	}
+
+	return ff.IntFlag(ctx, featureflags.MaxSandboxesPerNode)
+}
+
 type Server struct {
 	orchestrator.UnimplementedSandboxServiceServer
 	orchestrator.UnimplementedChunkServiceServer

@@ -146,7 +146,7 @@ func (s *Server) Create(ctx context.Context, req *orchestrator.SandboxCreateRequ
 		}
 	}
 
-	maxRunningSandboxesPerNode := s.featureFlags.IntFlag(ctx, featureflags.MaxSandboxesPerNode)
+	maxRunningSandboxesPerNode := runningSandboxesLimit(ctx, s.featureFlags)
 
 	runningSandboxes := s.sandboxFactory.Sandboxes.Count()
 	if runningSandboxes >= maxRunningSandboxesPerNode {

@@ -24,9 +24,10 @@ const (
 	// deduplicated union. Used while orchestrators and template managers run on
 	// both platforms at once.
 	ServiceDiscoveryProviderNomadKubernetes = "nomad+kubernetes"
-	// ServiceDiscoveryProviderLocal returns a single statically configured
-	// orchestrator address. Used to develop the API against the darwin dummy
-	// orchestrator on macOS, where neither Nomad nor Kubernetes is available.
+	// ServiceDiscoveryProviderLocal returns one or more statically configured
+	// orchestrator addresses. Used to develop the API against the darwin dummy
+	// orchestrator on macOS, where neither Nomad nor Kubernetes is available,
+	// and to front a fixed set of nodes without a scheduler.
 	ServiceDiscoveryProviderLocal = "local"
 )
 
@@ -87,9 +88,10 @@ type Config struct {
 	NomadOrchestratorLegacyDiscoveryEnabled bool `env:"NOMAD_ORCHESTRATOR_LEGACY_DISCOVERY_ENABLED" envDefault:"true"`
 
 	// LocalOrchestratorAddress is the "host:port" address of a statically
-	// configured orchestrator instance. Required when
-	// ServiceDiscoveryProvider=local. Used for local dev against the darwin
-	// dummy orchestrator.
+	// configured orchestrator instance, or a comma-separated list of them so a
+	// control plane can front more than one node without a scheduler. Required
+	// when ServiceDiscoveryProvider=local. Used for local dev against the
+	// darwin dummy orchestrator.
 	LocalOrchestratorAddress string `env:"LOCAL_ORCHESTRATOR_ADDRESS" envDefault:"127.0.0.1:5008"`
 
 	// Used when ServiceDiscoveryProvider is kubernetes or nomad+kubernetes.

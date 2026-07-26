@@ -72,7 +72,7 @@ type serviceDiscovery struct {
 //	nomad            - both go through the local Nomad agent
 //	kubernetes       - both list pods via the K8s API
 //	nomad+kubernetes - both are the deduplicated union of the two above
-//	local            - both point at one statically configured address
+//	local            - both point at the statically configured address list
 func newServiceDiscovery(ctx context.Context, config cfg.Config, newKube kubeClientFactory, provider string) (serviceDiscovery, error) {
 	switch provider {
 	case cfg.ServiceDiscoveryProviderKubernetes:
@@ -149,9 +149,9 @@ func newLocalServiceDiscovery(config cfg.Config) (serviceDiscovery, error) {
 		return serviceDiscovery{}, fmt.Errorf("local orchestrator discovery: %w", err)
 	}
 
-	// The local orchestrator doubles as the template builder when it is started
+	// The local orchestrators double as the template builders when started
 	// with ORCHESTRATOR_SERVICES=orchestrator,template-manager, so both planes
-	// point at the same address — the same backend, now that there is only one.
+	// point at the same addresses — the same backend, now that there is only one.
 	// An instance that does not report the TemplateBuilder role (the darwin
 	// dummy) registers with IsBuilder=false and is never selected for builds.
 	return serviceDiscovery{nodes: nodes, templateBuilders: nodes}, nil

@@ -3,6 +3,9 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	nomadapi "github.com/hashicorp/nomad/api"
@@ -16,6 +19,51 @@ import (
 )
 
 var testsInstanceHost = env.GetEnv("TESTS_ORCH_INSTANCE_HOST", "localhost")
+
+// staticOrchestratorHosts parses TESTS_ORCH_INSTANCE_HOST as a comma-separated
+// list, so a control plane in ENVIRONMENT=local can front more than one
+// orchestrator node without Nomad or Kubernetes. A single value keeps the
+// previous behavior, and the "local" identifiers it produced, byte for byte.
+//
+// Each entry is "host" or "host:port"; the port defaults to the orchestrator
+// gRPC port. Identifiers must be unique per node because the API keys its node
+// pool by NodeID, so with more than one host the entry itself becomes the ID.
+func staticOrchestratorHosts(raw string) []Item {
+	items := make([]Item, 0, 1)
+	entries := strings.Split(raw, ",")
+	single := len(entries) == 1
+
+	for _, entry := range entries {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+
+		host := entry
+		port := consts.OrchestratorAPIPort
+		if h, p, err := net.SplitHostPort(entry); err == nil {
+			host = h
+			if parsed, convErr := strconv.ParseUint(p, 10, 16); convErr == nil {
+				port = uint16(parsed)
+			}
+		}
+
+		id := entry
+		if single {
+			id = "local"
+		}
+
+		items = append(items, Item{
+			UniqueIdentifier:     id,
+			NodeID:               id,
+			InstanceID:           "unknown",
+			LocalIPAddress:       host,
+			LocalInstanceApiPort: port,
+		})
+	}
+
+	return items
+}
 
 type LocalServiceDiscovery struct {
 	nomad     *nomadapi.Client
@@ -41,15 +89,7 @@ func (sd *LocalServiceDiscovery) Query(ctx context.Context) ([]Item, error) {
 			return []Item{}, nil
 		}
 
-		return []Item{
-			{
-				UniqueIdentifier:     "local",
-				NodeID:               "local",
-				InstanceID:           "unknown",
-				LocalIPAddress:       testsInstanceHost,
-				LocalInstanceApiPort: consts.OrchestratorAPIPort,
-			},
-		}, nil
+		return staticOrchestratorHosts(testsInstanceHost), nil
 	}
 
 	// For now, we want to search only for template builders as local orchestrators are still discovered

@@ -140,6 +140,15 @@ func (h *APIStore) Logs(c *gin.Context) {
 		}(shadowURL, logs)
 	}
 
+	// No destination means forwarding is off. Without this the POST is
+	// unconditional and every sandbox log line costs an ERROR line.
+	if route.PrimaryURL == "" {
+		recordLogForwardWrite(ctx, "primary", "skipped", "no_collector")
+		c.Status(http.StatusNoContent)
+
+		return
+	}
+
 	// The primary write controls the response, preserving today's behavior.
 	if err := h.forwardLogs(c.Request.Context(), route.PrimaryURL, logs, route.Timeout); err != nil {
 		recordLogForwardWrite(ctx, "primary", "failure", "send_error")

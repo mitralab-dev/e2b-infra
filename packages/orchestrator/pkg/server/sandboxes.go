@@ -236,6 +236,14 @@ func (s *Server) Create(ctx context.Context, req *orchestrator.SandboxCreateRequ
 		return nil, fmt.Errorf("failed to read template metadata: %w", err)
 	}
 
+	// Merge Docker image ENV vars from the template metadata into the sandbox
+	// config. User-provided env vars (from the SDK create call) take precedence.
+	if len(meta.Context.EnvVars) > 0 {
+		merged := maps.Clone(meta.Context.EnvVars)
+		maps.Copy(merged, config.Envd.Vars)
+		config.Envd.Vars = merged
+	}
+
 	var sbx *sandbox.Sandbox
 	if meta.IsFilesystemOnly() {
 		fsOnly = true
@@ -1244,9 +1252,12 @@ func (s *Server) setupSandboxLifecycle(ctx context.Context, sbx *sandbox.Sandbox
 		ctx, childSpan := tracer.Start(context.WithoutCancel(ctx), "stop sandbox-lifecycle", trace.WithNewRoot())
 		defer childSpan.End()
 
-		waitErr := sbx.Wait(ctx)
+		waitErr := sbx.WaitForExit(ctx)
 		if waitErr != nil {
-			sbxlogger.I(sbx).Error(ctx, "failed to wait for sandbox, cleaning up", zap.Error(waitErr))
+			sbxlogger.I(sbx).Error(ctx, "sandbox exit wait failed, stopping", zap.Error(waitErr))
+			if stopErr := sbx.Stop(ctx); stopErr != nil {
+				sbxlogger.I(sbx).Error(ctx, "failed to stop timed-out sandbox", zap.Error(stopErr))
+			}
 		}
 
 		sbx.SetStoppedAt(time.Now())

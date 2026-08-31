@@ -42,8 +42,10 @@ func getDefaultGateway(ctx context.Context) (string, error) {
 	}
 
 	for _, route := range routes {
-		// 0.0.0.0/0
-		if route.Dst.String() == "0.0.0.0/0" && route.Gw != nil {
+		// Default route: netlink reports Dst as nil on some hosts, as the explicit
+		// 0.0.0.0/0 route on others (our bare-metal host uses the latter). Accept
+		// both, else getDefaultGateway returns an error and utils.Must panics at boot.
+		if (route.Dst == nil || route.Dst.String() == "0.0.0.0/0") && route.Gw != nil {
 			logger.L().Info(ctx, "default gateway", zap.String("gateway", route.Gw.String()))
 
 			link, linkErr := netlink.LinkByIndex(route.LinkIndex)

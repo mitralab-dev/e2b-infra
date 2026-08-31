@@ -78,15 +78,21 @@ func New(ctx context.Context, nodeID, serviceName, serviceCommit, serviceVersion
 	otel.SetMeterProvider(meterProvider)
 
 	// Setup logging
-	logProvider, err := NewLogProvider(ctx, res)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create log provider: %w", err)
+	logProvider := LogProvider(NewNoopLogProvider())
+	if otelLogsEnabled {
+		logProvider, err = NewLogProvider(ctx, res)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create log provider: %w", err)
+		}
 	}
 
 	// Setup tracing
-	spanExporter, err := NewSpanExporter(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create span exporter: %w", err)
+	var spanExporter sdktrace.SpanExporter = &noopSpanExporter{}
+	if otelTracesEnabled {
+		spanExporter, err = NewSpanExporter(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create span exporter: %w", err)
+		}
 	}
 
 	tracerProvider := NewTracerProvider(spanExporter, res)

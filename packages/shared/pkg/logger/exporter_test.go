@@ -2,6 +2,7 @@ package logger
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"go.uber.org/zap/zapcore"
 )
 
 func TestHTTPWriterSendLogLineStatus(t *testing.T) {
@@ -525,5 +528,86 @@ func TestDynamicHTTPWriterNilResolverIsLegacy(t *testing.T) {
 
 	if count.Load() != 1 {
 		t.Errorf("expected 1 request with nil resolver, got %d", count.Load())
+	}
+}
+
+type countingRoundTripper struct {
+	calls atomic.Int32
+}
+
+func (c *countingRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
+	c.calls.Add(1)
+
+	return nil, errors.New("unexpected request")
+}
+
+func TestHTTPWriterWithoutDestinationSendsNothing(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		newWriter func(context.Context) zapcore.WriteSyncer
+	}{
+		{
+			name: "static",
+			newWriter: func(ctx context.Context) zapcore.WriteSyncer {
+				return NewHTTPWriter(ctx, "")
+			},
+		},
+		{
+			name: "dynamic",
+			newWriter: func(ctx context.Context) zapcore.WriteSyncer {
+				return NewDynamicHTTPWriter(ctx, "", func(context.Context) LogRoute {
+					return LogRoute{Timeout: time.Second}
+				})
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			transport := &countingRoundTripper{}
+			writer := tt.newWriter(t.Context())
+			writer.(*HTTPWriter).httpClient.Transport = transport
+
+			if _, err := writer.Write([]byte(`{"level":"info","msg":"line"}` + "\n")); err != nil {
+				t.Fatalf("Write failed: %v", err)
+			}
+			if err := writer.Sync(); err != nil {
+				t.Fatalf("Sync failed: %v", err)
+			}
+			if got := transport.calls.Load(); got != 0 {
+				t.Fatalf("requests sent = %d, want 0", got)
+			}
+		})
+	}
+}
+
+// Pins that the guard never disables a configured collector.
+func TestDynamicHTTPWriterEmptyRouteUsesFallback(t *testing.T) {
+	t.Parallel()
+
+	var hits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	resolve := func(context.Context) LogRoute {
+		return LogRoute{Timeout: 2 * time.Second}
+	}
+
+	writer := NewDynamicHTTPWriter(t.Context(), server.URL, resolve)
+	if _, err := writer.Write([]byte(`{"level":"info","msg":"line"}` + "\n")); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	if err := writer.Sync(); err != nil {
+		t.Fatalf("Sync failed: %v", err)
+	}
+	if got := hits.Load(); got != 1 {
+		t.Fatalf("fallback endpoint hits = %d, want 1", got)
 	}
 }

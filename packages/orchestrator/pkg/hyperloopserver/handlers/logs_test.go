@@ -202,6 +202,72 @@ func TestAPIStoreLogsOmitsUnknownBuildAndCountsMissingTeam(t *testing.T) { //nol
 	assert.Equal(t, int64(1), degradedCount)
 }
 
+func TestAPIStoreLogsWithoutCollectorSkipsForward(t *testing.T) { //nolint:paralleltest // swaps package-global metric instrument
+	reader := sdkmetric.NewManualReader()
+	meterProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+	t.Cleanup(func() { require.NoError(t, meterProvider.Shutdown(t.Context())) })
+	testCounter, err := meterProvider.Meter(
+		"github.com/e2b-dev/infra/packages/orchestrator/pkg/hyperloopserver/handlers",
+	).Int64Counter(logForwardWriteCountName)
+	require.NoError(t, err)
+	previousCounter := logForwardWriteCount
+	logForwardWriteCount = testCounter
+	t.Cleanup(func() { logForwardWriteCount = previousCounter })
+
+	hostIP := net.IPv4(127, 0, 0, 5)
+	sbx := &sandbox.Sandbox{
+		LifecycleStartedAt: time.Now().UTC().Add(-time.Minute),
+		Metadata: &sandbox.Metadata{
+			Runtime: sandboxtypes.RuntimeMetadata{
+				SandboxID:  "sandbox-1",
+				TemplateID: "template-1",
+				TeamID:     "team-1",
+			},
+		},
+		Resources: &sandbox.Resources{
+			Slot: &network.Slot{HostIP: hostIP},
+		},
+	}
+	sandboxes := sandbox.NewSandboxesMap()
+	sandboxes.AssignNetwork(t.Context(), sbx)
+
+	store := NewHyperloopStore(logger.NewNopLogger(), sandboxes, "", nil)
+	router := gin.New()
+	router.POST("/logs", store.Logs)
+
+	request := httptest.NewRequestWithContext(
+		t.Context(),
+		http.MethodPost,
+		"/logs",
+		strings.NewReader(`{"instanceID":"sandbox-1","message":"hello"}`),
+	)
+	request.Header.Set("Content-Type", "application/json")
+	request.RemoteAddr = net.JoinHostPort(hostIP.String(), "4321")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	require.Equal(t, http.StatusNoContent, response.Code)
+
+	var metrics metricdata.ResourceMetrics
+	require.NoError(t, reader.Collect(t.Context(), &metrics))
+	require.Len(t, metrics.ScopeMetrics, 1)
+	require.Len(t, metrics.ScopeMetrics[0].Metrics, 1)
+	sum, ok := metrics.ScopeMetrics[0].Metrics[0].Data.(metricdata.Sum[int64])
+	require.True(t, ok)
+	skipped := attribute.NewSet(
+		attribute.String("route", "primary"),
+		attribute.String("result", "skipped"),
+		attribute.String("reason", "no_collector"),
+	)
+	var skippedCount int64
+	for _, point := range sum.DataPoints {
+		if point.Attributes.Equals(&skipped) {
+			skippedCount = point.Value
+		}
+	}
+	assert.Equal(t, int64(1), skippedCount)
+}
+
 func TestAPIStoreLogsRejectsMismatchedInstanceIDBeforeReplacingIdentity(t *testing.T) {
 	t.Parallel()
 

@@ -87,6 +87,9 @@ func NewLogger(loggerConfig LoggerConfig) (Logger, error) {
 	cores = append(cores, loggerConfig.Cores...)
 
 	logger, err := config.Build(
+		// Development mode would attach a stacktrace from Warn up, so a warn firing
+		// per request costs ten lines instead of one.
+		zap.AddStacktrace(zapcore.ErrorLevel),
 		zap.WrapCore(func(c zapcore.Core) zapcore.Core {
 			cores = append(cores, c)
 

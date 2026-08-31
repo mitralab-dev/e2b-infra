@@ -179,6 +179,11 @@ func (h *HTTPWriter) Sync() error {
 // never affect the returned error. When no resolver is configured it sends to
 // the legacy url (preserving today's behavior).
 func (h *HTTPWriter) routeLogLine(line []byte) error {
+	// No destination means shipping is off, not a failure to report per line.
+	if h.url == "" && h.resolve == nil {
+		return nil
+	}
+
 	if h.resolve == nil {
 		if err := h.sendLogLine(h.ctx, h.url, line); err != nil {
 			recordLogWriterWrite(h.ctx, "primary", "failure", "send_error")
@@ -196,6 +201,11 @@ func (h *HTTPWriter) routeLogLine(line []byte) error {
 		// Resolver guarantees a non-empty primary on non-disabled routes, but
 		// guard anyway to avoid a bad request.
 		primary = h.url
+	}
+
+	// Route and fallback both empty: nothing to ship to.
+	if primary == "" {
+		return nil
 	}
 
 	ctx := h.ctx

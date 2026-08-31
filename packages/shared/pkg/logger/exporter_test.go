@@ -527,3 +527,58 @@ func TestDynamicHTTPWriterNilResolverIsLegacy(t *testing.T) {
 		t.Errorf("expected 1 request with nil resolver, got %d", count.Load())
 	}
 }
+
+func TestHTTPWriterEmptyEndpointIsNoop(t *testing.T) {
+	t.Parallel()
+
+	writer := NewHTTPWriter(t.Context(), "")
+	if _, err := writer.Write([]byte(`{"level":"info","msg":"line"}` + "\n")); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	if err := writer.Sync(); err != nil {
+		t.Fatalf("Sync failed: %v", err)
+	}
+}
+
+func TestDynamicHTTPWriterEmptyRouteAndFallbackIsNoop(t *testing.T) {
+	t.Parallel()
+
+	resolve := func(context.Context) LogRoute {
+		return LogRoute{Timeout: time.Second}
+	}
+
+	writer := NewDynamicHTTPWriter(t.Context(), "", resolve)
+	if _, err := writer.Write([]byte(`{"level":"info","msg":"line"}` + "\n")); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	if err := writer.Sync(); err != nil {
+		t.Fatalf("Sync failed: %v", err)
+	}
+}
+
+// Pins that the guard never disables a configured collector.
+func TestDynamicHTTPWriterEmptyRouteUsesFallback(t *testing.T) {
+	t.Parallel()
+
+	var hits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	resolve := func(context.Context) LogRoute {
+		return LogRoute{Timeout: 2 * time.Second}
+	}
+
+	writer := NewDynamicHTTPWriter(t.Context(), server.URL, resolve)
+	if _, err := writer.Write([]byte(`{"level":"info","msg":"line"}` + "\n")); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	if err := writer.Sync(); err != nil {
+		t.Fatalf("Sync failed: %v", err)
+	}
+	if got := hits.Load(); got != 1 {
+		t.Fatalf("fallback endpoint hits = %d, want 1", got)
+	}
+}

@@ -12,6 +12,13 @@ import (
 
 var otelCollectorGRPCEndpoint = os.Getenv("OTEL_COLLECTOR_GRPC_ENDPOINT")
 
+// All three signals share OTEL_COLLECTOR_GRPC_ENDPOINT, so unsetting it to
+// silence one takes the other two with it. Unset means enabled.
+var (
+	otelLogsEnabled   = os.Getenv("OTEL_LOGS_ENABLED") != "false"
+	otelTracesEnabled = os.Getenv("OTEL_TRACES_ENABLED") != "false"
+)
+
 func OTELCollectorGRPCEndpoint() string {
 	return otelCollectorGRPCEndpoint
 }

@@ -122,13 +122,15 @@ func (u *Uffd) Start(ctx context.Context) error {
 		ctx, span := tracer.Start(ctx, "serve uffd")
 		defer span.End()
 
-		// TODO: If the handle function fails, we should kill the sandbox
 		handleErr := u.handle(ctx, fdExit)
 
 		// If handle failed before setting the handler value, set an error to unblock
 		// any waiters (e.g., prefetcher goroutines waiting on Prefault).
 		if handleErr != nil {
 			u.handler.SetError(handleErr)
+			u.logger.Error(ctx, "uffd handle failed, sandbox will be terminated",
+				zap.String("socket_path", u.socketPath),
+				zap.Error(handleErr))
 		}
 
 		closeErr := u.lis.Close()

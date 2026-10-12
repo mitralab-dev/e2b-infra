@@ -17,7 +17,10 @@ type SandboxLoggerConfig struct {
 	ServiceName string
 	// IsInternal differentiates between our (internal) logs, and user accessible (external) logs.
 	// For external logger, we also disable stacktraces
-	IsInternal       bool
+	IsInternal bool
+	// IsDebug sets the console level only; the collector and OTEL cores stay at
+	// debug, so user-facing sandbox logs are unaffected.
+	IsDebug          bool
 	CollectorAddress string
 	// FeatureFlags, when set for an external logger with a CollectorAddress,
 	// enables LaunchDarkly-controlled log write routing (see
@@ -49,7 +52,7 @@ func NewLogger(ctx context.Context, loggerProvider log.LoggerProvider, config Sa
 	lg, err := logger.NewLogger(logger.LoggerConfig{
 		ServiceName:       config.ServiceName,
 		IsInternal:        config.IsInternal,
-		IsDebug:           true,
+		IsDebug:           config.IsDebug,
 		DisableStacktrace: !config.IsInternal,
 		InitialFields: []zap.Field{
 			zap.String("logger", config.ServiceName),

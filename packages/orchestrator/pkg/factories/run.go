@@ -585,6 +585,7 @@ func run(config cfg.Config, opts Options) (success bool) {
 		sbxlogger.SandboxLoggerConfig{
 			ServiceName:      serviceName,
 			IsInternal:       true,
+			IsDebug:          env.IsDebug(),
 			CollectorAddress: env.LogsCollectorAddress(),
 		},
 	)

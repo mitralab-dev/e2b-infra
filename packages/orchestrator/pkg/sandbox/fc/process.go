@@ -217,15 +217,20 @@ func NewProcess(
 	}
 
 	cmd := exec.CommandContext(execCtx,
-		"unshare",
-		"-m",
-		"--",
 		"bash",
 		"-c",
 		startScript.Value,
 	)
 
-	p := &Process{
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setsid:       true,                // Create a new session
+		Unshareflags: syscall.CLONE_NEWNS, // Create a new mount namespace.
+		// Go's Unshareflags with CLONE_NEWNS already remounts / as MS_REC|MS_PRIVATE in
+		// the child (syscall/exec_linux.go). The `mount --make-rprivate /` that opens both
+		// start scripts is kept as a belt-and-braces guard, not as the only isolation.
+	}
+
+	return &Process{
 		Versions:              versions,
 		Exit:                  utils.NewErrorOnce(),
 		cmd:                   cmd,
@@ -239,13 +244,7 @@ func NewProcess(
 
 		kernelPath: startScript.KernelPath,
 		rootfsPath: startScript.RootfsPath,
-	}
-
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setsid: true, // Create a new session
-	}
-
-	return p, nil
+	}, nil
 }
 
 func (p *Process) configure(

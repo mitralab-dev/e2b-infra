@@ -135,9 +135,6 @@ func (u *Uffd) Start(ctx context.Context) error {
 		// any waiters (e.g., prefetcher goroutines waiting on Prefault).
 		if handleErr != nil {
 			u.handler.SetError(handleErr)
-			u.logger.Error(ctx, "uffd handle failed, sandbox will be terminated",
-				zap.String("socket_path", u.socketPath),
-				zap.Error(handleErr))
 		}
 		exitErr := handleErr
 		u.handshakeMu.Lock()
@@ -145,6 +142,11 @@ func (u *Uffd) Start(ctx context.Context) error {
 		u.handshakeMu.Unlock()
 		if stopping && (errors.Is(handleErr, net.ErrClosed) || errors.Is(handleErr, context.Canceled)) {
 			exitErr = nil
+		}
+		if exitErr != nil {
+			u.logger.Error(ctx, "uffd handle failed, sandbox will be terminated",
+				zap.String("socket_path", u.socketPath),
+				zap.Error(exitErr))
 		}
 
 		closeErr := u.lis.Close()

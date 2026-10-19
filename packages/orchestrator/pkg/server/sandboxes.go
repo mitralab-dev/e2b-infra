@@ -180,6 +180,12 @@ func firecrackerSupports(ctx context.Context, sbx *sandbox.Sandbox, feature stri
 	return true
 }
 
+// The API evictor ends an expired sandbox at its end time and pauses it when it
+// has auto-pause, which the node does not know about. The node's own TTL is the
+// backstop for an API that is down, so it waits this long past the end time
+// before killing, or it would kill sandboxes the API meant to pause.
+const nodeTTLGrace = 2 * time.Minute
+
 func (s *Server) Create(ctx context.Context, req *orchestrator.SandboxCreateRequest) (_ *orchestrator.SandboxCreateResponse, createErr error) {
 	releaseWork := s.info.TrackWork()
 	defer releaseWork()
@@ -2455,9 +2461,15 @@ func (s *Server) setupSandboxLifecycle(ctx context.Context, sbx *sandbox.Sandbox
 		ctx, childSpan := tracer.Start(context.WithoutCancel(ctx), "stop sandbox-lifecycle", trace.WithNewRoot())
 		defer childSpan.End()
 
-		waitErr := sbx.WaitForExit(ctx)
+		waitErr := sbx.WaitForExitAfter(ctx, nodeTTLGrace)
 		if waitErr != nil {
-			sbxlogger.I(sbx).Error(ctx, "sandbox exit wait failed, stopping", zap.Error(waitErr))
+			if errors.Is(waitErr, sandbox.ErrSandboxTTLExpired) {
+				// The API never ended it, so this is the backstop: a kill, not a crash.
+				sbx.SetStopReason(sandbox.StopReasonKilled)
+				sbxlogger.I(sbx).Info(ctx, "sandbox TTL expired, stopping")
+			} else {
+				sbxlogger.I(sbx).Error(ctx, "sandbox exit wait failed, stopping", zap.Error(waitErr))
+			}
 			if stopErr := sbx.Stop(ctx); stopErr != nil {
 				sbxlogger.I(sbx).Error(ctx, "failed to stop timed-out sandbox", zap.Error(stopErr))
 			}

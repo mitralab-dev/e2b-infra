@@ -4612,6 +4612,65 @@ func serveMemory(
 	return nil
 }
 
+// ErrSandboxTTLExpired is what WaitForExit returns when the sandbox outlives
+// its end time plus the grace, so the caller can tell an expiry from a
+// Firecracker failure.
+var ErrSandboxTTLExpired = errors.New("sandbox TTL expired")
+
+func (s *Sandbox) WaitForExit(ctx context.Context) error {
+	return s.WaitForExitAfter(ctx, 0)
+}
+
+// WaitForExitAfter enforces the TTL only once grace has passed beyond the end time.
+func (s *Sandbox) WaitForExitAfter(ctx context.Context, grace time.Duration) error {
+	ctx, span := tracer.Start(ctx, "sandbox-wait-for-exit")
+	defer span.End()
+
+	for {
+		endAt := s.GetEndAt()
+		timeout := time.Until(endAt.Add(grace))
+		if timeout <= 0 {
+			return s.exitResultOr(ErrSandboxTTLExpired)
+		}
+
+		timer := time.NewTimer(timeout)
+		select {
+		case <-timer.C:
+			// Re-check in case SetEndAt extended the deadline (e.g. via KeepAlive).
+			if s.GetEndAt().After(endAt) {
+				continue
+			}
+			return s.exitResultOr(ErrSandboxTTLExpired)
+		case <-ctx.Done():
+			timer.Stop()
+			return nil
+		case <-s.exit.Done():
+			timer.Stop()
+			return s.exitResult()
+		}
+	}
+}
+
+// exitResultOr prefers an exit that is already in: select picks at random when
+// the timer and the exit are ready together, and a crash must not read as a TTL.
+func (s *Sandbox) exitResultOr(err error) error {
+	select {
+	case <-s.exit.Done():
+		return s.exitResult()
+	default:
+		return err
+	}
+}
+
+func (s *Sandbox) exitResult() error {
+	err := s.exit.Error()
+	if err == nil {
+		return nil
+	}
+
+	return fmt.Errorf("fc process exited prematurely: %w", err)
+}
+
 func (s *Sandbox) WaitForEnvd(
 	ctx context.Context,
 	startType StartType,

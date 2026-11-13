@@ -175,7 +175,8 @@ The control-plane entry point (Gin, OpenAPI-generated from `spec/openapi.yml`, p
   pool against `HugePages_Total` as before. A node that reports no pool scores 0.5. Hugepage scoring
   is on by default (`BEST_OF_K_HUGEPAGE_MEMORY`); set it false to rank on
   CPU alone. K, overcommit ratio, and alpha are tunable live via feature
-  flags. With `placement-hugepage-limit-percent` above 0, a hugepage sandbox
+  flags. With `placement-hugepage-limit-percent` above 0
+  (`PLACEMENT_HUGEPAGE_LIMIT_PERCENT` for a deployment without LaunchDarkly), a hugepage sandbox
   is also refused by any node whose committed hugepages would pass that share
   of the node's pool ceiling (base pool plus overcommit allowance, reported by
   the orchestrator); within an API replica the check and the in-flight record
